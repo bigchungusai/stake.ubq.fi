@@ -107,6 +107,25 @@ describe("rpcHealthCheck", () => {
     expect(result.status).toBe("aborted");
   });
 
+  it("times out when headers resolve immediately but response.json() never settles", async () => {
+    const headersOnlyHangingBodyFetcher = (async () =>
+      ({
+        ok: true,
+        status: 200,
+        json: () => new Promise<unknown>(() => undefined),
+      }) as unknown as Response) as typeof fetch;
+
+    const startedAt = Date.now();
+    const result = await rpcHealthCheck("https://rpc.example", {
+      timeoutMs: 25,
+      fetcher: headersOnlyHangingBodyFetcher,
+    });
+
+    expect(result.status).toBe("timeout");
+    expect(result.error).toContain("Timed out after 25ms");
+    expect(Date.now() - startedAt).toBeLessThan(2_000);
+  });
+
   it("exposes a short bounded default timeout", () => {
     expect(DEFAULT_RPC_HEALTH_TIMEOUT_MS).toBeLessThanOrEqual(2_000);
   });
