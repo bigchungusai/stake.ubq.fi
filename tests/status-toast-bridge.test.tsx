@@ -92,6 +92,24 @@ describe("StatusToastBridge recovery", () => {
     });
   });
 
+  it("dismisses a reverted-receipt toast from the success channel when the status clears before the next action", async () => {
+    renderBridge();
+
+    await act(async () => {
+      dispatch?.({ type: "setSuccess", message: "Transaction reverted" });
+    });
+    expect(await screen.findByText("Transaction reverted")).not.toBeNull();
+
+    // Clearing status before starting the next staking action must dismiss the stale revert toast
+    await act(async () => {
+      dispatch?.({ type: "clear" });
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Transaction reverted")).toBeNull();
+    });
+  });
+
   it("supersedes an older failure toast with the newest one", async () => {
     renderBridge();
 
