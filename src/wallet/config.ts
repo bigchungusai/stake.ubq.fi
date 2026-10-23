@@ -49,15 +49,20 @@ function createRpcTransport(rpcUrl: string): Transport {
  * health probe, and wagmi memoizes the client it builds from these transports. Resolving
  * here is what lets the probe selection actually replace the endpoint that is called.
  */
-function dynamicRpcTransport(createTransport: () => Transport[]): Transport {
+export function dynamicRpcTransport(createTransport: () => Transport[]): Transport {
   const transport: Transport = (params) => {
-    const [primary, ...rest] = createTransport();
-    if (!primary) throw new Error("No RPC transport URL is available");
-    if (rest.length === 0) return primary(params);
-    return fallback(
-      [primary, ...rest].map((next) => next(params)),
-      { rank: false }
-    )(params);
+    const resolveTransportInstance = () => {
+      const [primary, ...rest] = createTransport();
+      if (!primary) throw new Error("No RPC transport URL is available");
+      if (rest.length === 0) return primary({ ...params, retryCount: 0 });
+      return fallback([primary, ...rest], { rank: false })({ ...params, retryCount: 0 });
+    };
+
+    const initial = resolveTransportInstance();
+    return {
+      ...initial,
+      request: (args, options) => resolveTransportInstance().request(args, options),
+    };
   };
 
   return transport;
